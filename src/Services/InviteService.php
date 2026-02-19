@@ -127,8 +127,8 @@ class InviteService
             $errors[] = 'Informe um endereço válido.';
         }
 
-        if (($lat === null) !== ($lng === null)) {
-            $errors[] = 'Informe latitude e longitude juntos.';
+        if ($lat === null || $lng === null) {
+            $errors[] = 'Selecione um local da lista para preencher latitude e longitude.';
         }
 
         if ($lat !== null && ($lat < -90 || $lat > 90)) {

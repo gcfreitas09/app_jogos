@@ -17,4 +17,7 @@ return [
         'from_email' => 'no-reply@app-jogos.local',
         'from_name' => 'App Jogos',
     ],
+    'google_maps' => [
+        'api_key' => getenv('GOOGLE_MAPS_API_KEY') ?: '',
+    ],
 ];
