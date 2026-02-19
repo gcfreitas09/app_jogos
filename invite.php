@@ -118,6 +118,12 @@ require __DIR__ . '/templates/header.php';
                 </button>
             </form>
         <?php elseif ($invite['is_creator']): ?>
+            <form method="post" action="<?php echo e(url('delete_invite.php')); ?>" class="inline-form" onsubmit="return confirm('Tem certeza que deseja excluir este convite?');">
+                <?php echo csrf_field(); ?>
+                <input type="hidden" name="invite_id" value="<?php echo e((string) $invite['id']); ?>">
+                <input type="hidden" name="redirect_to" value="my_games.php">
+                <button type="submit" class="btn-danger">Excluir convite</button>
+            </form>
             <span class="hint">Você criou este convite.</span>
         <?php else: ?>
             <span class="hint">Sem ações disponíveis.</span>

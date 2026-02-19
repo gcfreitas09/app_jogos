@@ -439,6 +439,11 @@ body.route-modal-open {
 .route-modal[hidden] {
     display: none !important;
 }
+@media (max-width: 900px) {
+    #map-preview-frame {
+        min-height: 260px;
+    }
+}
 @media (max-width: 680px) {
     .location-input-row {
         grid-template-columns: 1fr;
@@ -446,6 +451,30 @@ body.route-modal-open {
     .location-maps-btn {
         width: 100%;
         min-width: 0;
+    }
+    .map-nav-actions .btn {
+        width: 100%;
+    }
+    .route-modal {
+        padding: 12px;
+    }
+    .route-modal-card {
+        padding: 16px;
+        border-radius: 16px;
+    }
+    .route-modal-actions {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 480px) {
+    #map-preview-frame {
+        min-height: 220px;
+    }
+    .route-option {
+        padding: 12px;
+    }
+    .route-option strong {
+        font-size: 17px;
     }
 }
 </style>
