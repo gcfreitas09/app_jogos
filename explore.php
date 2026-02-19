@@ -102,6 +102,36 @@ usort(
 );
 $hotInvites = array_slice($hotInvites, 0, 3);
 
+$mapInvites = [];
+foreach ($upcomingInvites as $invite) {
+    if (!isset($invite['lat'], $invite['lng']) || $invite['lat'] === null || $invite['lng'] === null) {
+        continue;
+    }
+
+    $mapInvites[] = [
+        'id' => (int) $invite['id'],
+        'lat' => (float) $invite['lat'],
+        'lng' => (float) $invite['lng'],
+        'title' => (string) $invite['location_name'],
+        'sport' => (string) $invite['sport'],
+        'starts_at_label' => (string) $invite['starts_at_label'],
+        'url' => url('invite.php?id=' . (string) $invite['id']),
+    ];
+}
+
+$mapInvitesJson = json_encode(
+    $mapInvites,
+    JSON_UNESCAPED_UNICODE
+    | JSON_UNESCAPED_SLASHES
+    | JSON_HEX_TAG
+    | JSON_HEX_AMP
+    | JSON_HEX_APOS
+    | JSON_HEX_QUOT
+);
+if (!is_string($mapInvitesJson)) {
+    $mapInvitesJson = '[]';
+}
+
 $listQuery = array_filter(
     [
         'sport' => $selectedSport,
@@ -123,6 +153,93 @@ if ($listQuery !== []) {
 $title = 'Explorar';
 require __DIR__ . '/templates/header.php';
 ?>
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
+<style>
+    .explore-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+    }
+    .explore-map-rail {
+        position: sticky;
+        top: 84px;
+        align-self: start;
+    }
+    .explore-content-rail {
+        min-width: 0;
+    }
+    .explore-map-card {
+        margin: 0;
+    }
+    .explore-map-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+    .explore-map-tools {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .explore-map-google-link {
+        width: auto;
+        padding: 6px 10px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    .explore-map-canvas {
+        width: 100%;
+        height: 360px;
+        border: 1px solid #d2e2ea;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .explore-map-note {
+        margin-top: 10px;
+    }
+    .invite-card.is-map-selected {
+        border-color: #f28c3d;
+        box-shadow: 0 0 0 2px rgba(242, 140, 61, 0.25), 0 8px 22px rgba(34, 62, 83, 0.08);
+    }
+    html[data-theme='dark'] .explore-map-canvas {
+        border-color: #35536a;
+    }
+    @media (max-width: 1100px) {
+        .explore-layout {
+            grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+        }
+        .explore-map-canvas {
+            height: 430px;
+        }
+    }
+    @media (max-width: 920px) {
+        .explore-layout {
+            grid-template-columns: 1fr;
+        }
+        .explore-map-rail {
+            position: static;
+        }
+        .explore-map-card {
+            margin-bottom: 14px;
+        }
+        .explore-map-canvas {
+            height: 320px;
+        }
+    }
+    @media (max-width: 760px) {
+        .explore-map-canvas {
+            height: 280px;
+        }
+    }
+</style>
 <section class="hero">
     <div class="hero-content">
         <h1>Explore jogos perto de você</h1>
@@ -130,6 +247,34 @@ require __DIR__ . '/templates/header.php';
     </div>
 </section>
 
+<div class="explore-layout">
+    <aside class="explore-map-rail">
+        <section class="card card-soft explore-map-card">
+            <div class="explore-map-head">
+                <h2>Mapa de jogos</h2>
+                <div class="explore-map-tools">
+                    <span class="pill-count"><?php echo e((string) count($mapInvites)); ?> pin(s)</span>
+                    <a
+                        id="explore-google-map-link"
+                        class="btn btn-outline explore-map-google-link"
+                        href="https://www.google.com/maps"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >Google Maps</a>
+                </div>
+            </div>
+            <div
+                id="explore-map"
+                class="explore-map-canvas"
+                data-user-lat="<?php echo e($userLat !== null ? (string) $userLat : ''); ?>"
+                data-user-lng="<?php echo e($userLng !== null ? (string) $userLng : ''); ?>"
+            ></div>
+            <p class="muted explore-map-note">Clique no pin para destacar o convite correspondente.</p>
+            <script type="application/json" id="explore-map-data"><?php echo $mapInvitesJson; ?></script>
+        </section>
+    </aside>
+
+    <div class="explore-content-rail">
 <section class="card card-soft">
     <form method="get" action="<?php echo e(url('explore.php')); ?>" class="filter-grid" id="explore-filter-form">
         <div>
@@ -198,11 +343,17 @@ require __DIR__ . '/templates/header.php';
         <span class="pill-count"><?php echo e((string) count($upcomingInvites)); ?> resultado(s)</span>
     </div>
     <?php if ($upcomingInvites === []): ?>
-        <div class="empty-state card-soft">Nenhum jogo encontrado com os filtros atuais.</div>
+        <div class="empty-state card-soft">
+            <?php if ($userLat !== null && $userLng !== null): ?>
+                Nenhum jogo encontrado dentro de <?php echo e((string) $selectedRadius); ?> km da sua localização.
+            <?php else: ?>
+                Nenhum jogo encontrado com os filtros atuais.
+            <?php endif; ?>
+        </div>
     <?php else: ?>
         <div class="invite-grid">
             <?php foreach ($upcomingInvites as $invite): ?>
-                <article class="invite-card">
+                <article class="invite-card" id="invite-card-<?php echo e((string) $invite['id']); ?>" data-invite-id="<?php echo e((string) $invite['id']); ?>">
                     <div class="invite-top">
                         <span class="badge sport"><?php echo e((string) $invite['sport']); ?></span>
                         <span class="badge status <?php echo e((string) $invite['status_derived']); ?>"><?php echo e((string) $invite['status_label']); ?></span>
@@ -210,7 +361,13 @@ require __DIR__ . '/templates/header.php';
                     <h3><?php echo e((string) $invite['location_name']); ?></h3>
                     <p class="muted"><?php echo e((string) $invite['address']); ?></p>
                     <p class="muted">Início: <?php echo e((string) $invite['starts_at_label']); ?></p>
-                    <p class="muted">Distância: <?php echo e((string) $invite['distance_label']); ?></p>
+                    <?php if ($userLat !== null && $userLng !== null && $invite['distance_km'] !== null): ?>
+                        <p class="muted">Distância: <?php echo e((string) $invite['distance_label']); ?> de você</p>
+                    <?php elseif ($userLat !== null && $userLng !== null): ?>
+                        <p class="muted">Distância: local sem coordenadas</p>
+                    <?php else: ?>
+                        <p class="muted">Distância: <?php echo e((string) $invite['distance_label']); ?></p>
+                    <?php endif; ?>
                     <div class="slots-row">
                         <span>Vagas</span>
                         <strong><?php echo e((string) $invite['players_count']); ?> / <?php echo e((string) $invite['max_players']); ?></strong>
@@ -328,6 +485,14 @@ require __DIR__ . '/templates/header.php';
     <?php endif; ?>
 </section>
 
+    </div>
+</div>
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var locationButton = document.getElementById('use-location-btn');
@@ -381,48 +546,199 @@ document.addEventListener('DOMContentLoaded', function () {
 
     fillLabelIfMissing();
 
-    if (!locationButton) {
+    if (locationButton) {
+        locationButton.addEventListener('click', function () {
+            if (!navigator.geolocation) {
+                alert('Geolocalização não suportada neste navegador.');
+                return;
+            }
+
+            locationButton.disabled = true;
+            locationButton.textContent = 'Capturando...';
+
+            navigator.geolocation.getCurrentPosition(async function (position) {
+                    var lat = position.coords.latitude.toFixed(7);
+                    var lng = position.coords.longitude.toFixed(7);
+
+                    latInput.value = lat;
+                    lngInput.value = lng;
+
+                    try {
+                        var label = await reverseGeocode(lat, lng);
+                        locationLabelInput.value = label;
+                    } catch (error) {
+                        locationLabelInput.value = 'Localização detectada';
+                    }
+
+                    document.getElementById('explore-filter-form').submit();
+                },
+                function () {
+                    locationButton.disabled = false;
+                    locationButton.textContent = 'Usar minha localização';
+                    alert('Não foi possível capturar sua localização.');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 60000
+                }
+            );
+        });
+    }
+
+    var mapElement = document.getElementById('explore-map');
+    var mapDataNode = document.getElementById('explore-map-data');
+    var googleMapLink = document.getElementById('explore-google-map-link');
+    if (!mapElement || !mapDataNode || typeof window.L === 'undefined') {
         return;
     }
 
-    locationButton.addEventListener('click', function () {
-        if (!navigator.geolocation) {
-            alert('Geolocalização não suportada neste navegador.');
+    function parseCoordinate(rawValue) {
+        if (rawValue === null || rawValue === undefined) {
+            return null;
+        }
+
+        var text = String(rawValue).trim();
+        if (text === '') {
+            return null;
+        }
+
+        text = text.replace(',', '.');
+        var numberValue = Number(text);
+        if (!Number.isFinite(numberValue)) {
+            return null;
+        }
+
+        return numberValue;
+    }
+
+    var mapRows = [];
+    try {
+        mapRows = JSON.parse(mapDataNode.textContent || '[]');
+    } catch (error) {
+        mapRows = [];
+    }
+
+    if (!Array.isArray(mapRows) || mapRows.length === 0) {
+        mapElement.innerHTML = '<div class="empty-state" style="margin: 10px;">Nenhum convite com localização nos filtros atuais.</div>';
+        return;
+    }
+
+    var userLatMap = parseCoordinate(mapElement.dataset.userLat || null);
+    var userLngMap = parseCoordinate(mapElement.dataset.userLng || null);
+
+    function setGoogleMapsLink(destinationLat, destinationLng) {
+        if (!googleMapLink) {
+            return;
+        }
+        if (destinationLat === null || destinationLng === null) {
+            googleMapLink.setAttribute('href', 'https://www.google.com/maps');
             return;
         }
 
-        locationButton.disabled = true;
-        locationButton.textContent = 'Capturando...';
+        var destination = String(destinationLat) + ',' + String(destinationLng);
+        if (userLatMap !== null && userLngMap !== null) {
+            var origin = String(userLatMap) + ',' + String(userLngMap);
+            googleMapLink.setAttribute(
+                'href',
+                'https://www.google.com/maps/dir/?api=1&origin='
+                    + encodeURIComponent(origin)
+                    + '&destination='
+                    + encodeURIComponent(destination)
+            );
+            return;
+        }
 
-        navigator.geolocation.getCurrentPosition(async function (position) {
-                var lat = position.coords.latitude.toFixed(7);
-                var lng = position.coords.longitude.toFixed(7);
-
-                latInput.value = lat;
-                lngInput.value = lng;
-
-                try {
-                    var label = await reverseGeocode(lat, lng);
-                    locationLabelInput.value = label;
-                } catch (error) {
-                    locationLabelInput.value = 'Localização detectada';
-                }
-
-                document.getElementById('explore-filter-form').submit();
-            },
-            function () {
-                locationButton.disabled = false;
-                locationButton.textContent = 'Usar minha localização';
-                alert('Não foi possível capturar sua localização.');
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 8000,
-                maximumAge: 60000
-            }
+        googleMapLink.setAttribute(
+            'href',
+            'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(destination)
         );
+    }
+
+    var map = L.map(mapElement, {
+        zoomControl: true,
+        scrollWheelZoom: false
     });
+
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: '&copy; Google Maps'
+    }).addTo(map);
+
+    var bounds = L.latLngBounds();
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function focusInviteCard(inviteId) {
+        var cards = document.querySelectorAll('.invite-card[data-invite-id]');
+        cards.forEach(function (card) {
+            card.classList.remove('is-map-selected');
+        });
+
+        var selectedCard = document.getElementById('invite-card-' + String(inviteId));
+        if (!selectedCard) {
+            return;
+        }
+
+        selectedCard.classList.add('is-map-selected');
+        selectedCard.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+    }
+
+    mapRows.forEach(function (row) {
+        var lat = parseCoordinate(row.lat);
+        var lng = parseCoordinate(row.lng);
+        if (lat === null || lng === null) {
+            return;
+        }
+
+        var marker = L.marker([lat, lng]).addTo(map);
+        bounds.extend([lat, lng]);
+        marker.bindPopup(
+            '<strong>' + escapeHtml(row.title) + '</strong>'
+            + '<br>' + escapeHtml(row.sport) + ' - ' + escapeHtml(row.starts_at_label)
+            + '<br><a href="' + escapeHtml(row.url) + '">Abrir convite</a>'
+        );
+        marker.on('click', function () {
+            focusInviteCard(row.id);
+            setGoogleMapsLink(lat, lng);
+        });
+    });
+
+    if (mapRows.length > 0) {
+        var firstLat = parseCoordinate(mapRows[0].lat);
+        var firstLng = parseCoordinate(mapRows[0].lng);
+        setGoogleMapsLink(firstLat, firstLng);
+    }
+
+    if (userLatMap !== null && userLngMap !== null) {
+        L.circleMarker([userLatMap, userLngMap], {
+            radius: 8,
+            color: '#0b7f6f',
+            weight: 2,
+            fillColor: '#33d1bc',
+            fillOpacity: 0.9
+        }).addTo(map).bindPopup('Sua localização');
+        bounds.extend([userLatMap, userLngMap]);
+    }
+
+    if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.16));
+    } else {
+        map.setView([-30.03, -51.23], 11);
+    }
 });
 </script>
 <?php
 require __DIR__ . '/templates/footer.php';
+

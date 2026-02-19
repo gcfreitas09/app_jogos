@@ -538,11 +538,17 @@ class InviteRepository
                     WHEN i.lat IS NULL OR i.lng IS NULL THEN NULL
                     ELSE (
                         6371 * ACOS(
-                            COS(RADIANS(:' . $prefix . '_user_lat_1))
-                            * COS(RADIANS(i.lat))
-                            * COS(RADIANS(i.lng) - RADIANS(:' . $prefix . '_user_lng_1))
-                            + SIN(RADIANS(:' . $prefix . '_user_lat_2))
-                            * SIN(RADIANS(i.lat))
+                            LEAST(
+                                1,
+                                GREATEST(
+                                    -1,
+                                    COS(RADIANS(:' . $prefix . '_user_lat_1))
+                                    * COS(RADIANS(i.lat))
+                                    * COS(RADIANS(i.lng) - RADIANS(:' . $prefix . '_user_lng_1))
+                                    + SIN(RADIANS(:' . $prefix . '_user_lat_2))
+                                    * SIN(RADIANS(i.lat))
+                                )
+                            )
                         )
                     )
                 END)';
