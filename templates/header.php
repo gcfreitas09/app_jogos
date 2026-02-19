@@ -1,9 +1,43 @@
 <?php
 declare(strict_types=1);
-
 $title = $title ?? APP_NAME;
 $flashMessages = pull_flash_messages();
 $currentUser = $currentUser ?? null;
+$pageClass = isset($pageClass) && is_string($pageClass) ? trim($pageClass) : '';
+
+$currentPath = basename((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH));
+if ($currentPath === '') {
+    $currentPath = 'index.php';
+}
+$isActivePage = static fn (string $page): string => $currentPath === $page ? 'is-active' : '';
+
+$headerUserName = $currentUser !== null ? trim((string) ($currentUser['name'] ?? '')) : '';
+$headerAvatarUrl = '';
+if (
+    $currentUser !== null
+    && isset($profileService)
+    && is_object($profileService)
+    && method_exists($profileService, 'getProfile')
+) {
+    $headerProfile = $profileService->getProfile((int) $currentUser['id']);
+    if (is_array($headerProfile)) {
+        $storedAvatar = trim((string) ($headerProfile['avatar_url'] ?? ''));
+        if ($storedAvatar !== '') {
+            if (preg_match('#^https?://#i', $storedAvatar) === 1) {
+                $headerAvatarUrl = $storedAvatar;
+            } else {
+                $headerAvatarUrl = url($storedAvatar);
+            }
+        }
+    }
+}
+
+$headerUserInitial = 'U';
+if ($headerUserName !== '') {
+    $headerUserInitial = function_exists('mb_substr')
+        ? mb_strtoupper(mb_substr($headerUserName, 0, 1))
+        : strtoupper(substr($headerUserName, 0, 1));
+}
 ?>
 <!doctype html>
 <html lang="pt-BR">
@@ -11,9 +45,22 @@ $currentUser = $currentUser ?? null;
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo e($title); ?> - <?php echo e(APP_NAME); ?></title>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('app_jogos_theme');
+                if (savedTheme === 'dark' || savedTheme === 'light') {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                }
+            } catch (error) {
+                // ignore
+            }
+        })();
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Archivo:wght@600;700&display=swap');
         :root {
+            --layout-max: 1240px;
             --bg: #eef6f8;
             --bg-mesh: radial-gradient(circle at 15% 20%, #d2f4ea 0, transparent 45%),
                        radial-gradient(circle at 85% 0, #ffe4cc 0, transparent 36%),
@@ -71,51 +118,60 @@ $currentUser = $currentUser ?? null;
             backdrop-filter: blur(10px);
             background: rgba(255, 255, 255, 0.9);
             border-bottom: 1px solid rgba(166, 188, 201, 0.35);
-            min-height: 66px;
-        }
-        .app-corner-brand {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-weight: 700;
-            text-decoration: none;
-            color: var(--primary-dark);
-            font-size: 20px;
-            letter-spacing: -0.01em;
         }
         .topbar-inner {
             width: min(100%, var(--layout-max));
             margin: 0 auto;
-            padding: 14px 20px;
+            padding: 11px 16px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
             gap: 12px;
-            flex-wrap: wrap;
         }
-        .brand {
-            font-weight: 700;
+        .app-brand {
+            display: inline-flex;
+            align-items: center;
             text-decoration: none;
             color: var(--primary-dark);
-            font-size: 20px;
+            font-weight: 700;
+            font-size: 26px;
             letter-spacing: -0.01em;
-        }
-        .user-spot {
-            color: var(--muted);
-            font-weight: 600;
             white-space: nowrap;
+            max-width: 145px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .user-spot {
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 8px;
+            min-width: 0;
+            max-width: 320px;
+        }
+        .user-chip-name {
+            font-size: 18px;
             font-weight: 700;
             color: var(--primary-dark);
-            font-size: 20px;
-            line-height: 1.1;
-            letter-spacing: -0.01em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 280px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            object-fit: cover;
+            border: 2px solid #cddfec;
+            background: #eef5fb;
+            flex: 0 0 36px;
+        }
+        .user-avatar-fallback {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #1f4f72;
+            background: linear-gradient(145deg, #d6ecff 0%, #e7f5ff 100%);
         }
         .nav {
             display: flex;
@@ -123,37 +179,41 @@ $currentUser = $currentUser ?? null;
             flex-wrap: wrap;
             gap: 8px;
             min-width: 0;
+            margin-left: auto;
         }
         .theme-switch {
-            display: inline-flex;
+            display: inline-grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             align-items: center;
-            gap: 4px;
-            padding: 4px;
+            gap: 0;
+            padding: 3px;
             border-radius: 999px;
             border: 1px solid #c7d8e2;
             background: #fff;
+            overflow: hidden;
+            width: 92px;
+            min-width: 92px;
         }
         .theme-choice {
-            width: 32px !important;
-            min-width: 32px;
-            height: 32px;
+            width: 100% !important;
+            min-width: 0;
+            height: 34px;
             padding: 0 !important;
             border-radius: 999px !important;
             border: 1px solid transparent !important;
             background: transparent !important;
             color: #31536a !important;
-            font-size: 15px;
+            font-size: 18px;
             line-height: 1;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             box-shadow: none !important;
             transform: none !important;
+            cursor: pointer;
         }
         .theme-choice:hover {
             background: #eaf5fa !important;
-            transform: none !important;
-            box-shadow: none !important;
         }
         .theme-choice.is-selected {
             background: #e4f6f0 !important;
@@ -180,42 +240,6 @@ $currentUser = $currentUser ?? null;
         }
         .nav a:hover {
             background: #eaf3f2;
-        }
-        .theme-switch {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px;
-            border-radius: 999px;
-            border: 1px solid #c7d8e2;
-            background: #fff;
-        }
-        .theme-choice {
-            width: 34px !important;
-            min-width: 34px;
-            height: 34px;
-            padding: 0 !important;
-            border-radius: 999px !important;
-            border: 1px solid transparent !important;
-            background: transparent !important;
-            color: #31536a !important;
-            font-size: 16px;
-            line-height: 1;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: none !important;
-            transform: none !important;
-        }
-        .theme-choice:hover {
-            background: #eaf5fa !important;
-            transform: none !important;
-            box-shadow: none !important;
-        }
-        .theme-choice.is-selected {
-            background: #e4f6f0 !important;
-            color: #0b6d5f !important;
-            border-color: #9dd3c4 !important;
         }
         .muted {
             color: var(--muted);
@@ -582,7 +606,95 @@ $currentUser = $currentUser ?? null;
         .text-right {
             text-align: right;
         }
+        html[data-theme='dark'] body {
+            background: radial-gradient(circle at 15% 20%, #0a2530 0, transparent 45%),
+                        radial-gradient(circle at 85% 0, #2a1f16 0, transparent 40%),
+                        linear-gradient(160deg, #071a2e 0%, #0d1b2b 55%, #0c2131 100%);
+            color: #dde9f5;
+        }
+        html[data-theme='dark'] .topbar {
+            background: rgba(6, 19, 33, 0.9);
+            border-bottom-color: #274258;
+        }
+        html[data-theme='dark'] .app-brand,
+        html[data-theme='dark'] .user-chip-name,
+        html[data-theme='dark'] .nav a {
+            color: #dff0ff;
+        }
+        html[data-theme='dark'] .theme-switch {
+            background: #12263a;
+            border-color: #2f4d64;
+        }
+        html[data-theme='dark'] .theme-choice {
+            color: #c1d9ee !important;
+        }
+        html[data-theme='dark'] .theme-choice:hover {
+            background: #1f3b53 !important;
+        }
+        html[data-theme='dark'] .theme-choice.is-selected {
+            background: #174666 !important;
+            border-color: #3d7092 !important;
+            color: #ffffff !important;
+        }
+        html[data-theme='dark'] .nav a.is-active {
+            background: #1a3f5a;
+            color: #ffffff;
+        }
+        html[data-theme='dark'] .card,
+        html[data-theme='dark'] .card-soft,
+        html[data-theme='dark'] .invite-card,
+        html[data-theme='dark'] table,
+        html[data-theme='dark'] tr {
+            background: #13273a !important;
+            border-color: #294860 !important;
+            color: #e7f2fb !important;
+            box-shadow: 0 10px 24px rgba(1, 8, 14, 0.35);
+        }
+        html[data-theme='dark'] .empty-state,
+        html[data-theme='dark'] .participant-item {
+            background: #102235 !important;
+            border-color: #27455d !important;
+            color: #d5e6f4 !important;
+        }
+        html[data-theme='dark'] input,
+        html[data-theme='dark'] select,
+        html[data-theme='dark'] textarea {
+            background: #0f2235;
+            border-color: #35536a;
+            color: #e8f5ff;
+        }
+        html[data-theme='dark'] .btn-outline {
+            background: #132a40;
+            border-color: #3a6583;
+            color: #deefff;
+        }
+        html[data-theme='dark'] .muted,
+        html[data-theme='dark'] .hint,
+        html[data-theme='dark'] th,
+        html[data-theme='dark'] .detail-label {
+            color: #a5bdd0 !important;
+        }
+        html[data-theme='dark'] .pill-count {
+            background: #18354b;
+            border-color: #2f5b78;
+            color: #cbe6fb;
+        }
+        html[data-theme='dark'] .user-avatar {
+            border-color: #3c5f79;
+        }
+        @media (max-width: 1180px) {
+            .user-chip {
+                max-width: 220px;
+            }
+            .user-chip-name {
+                max-width: 150px;
+                font-size: 16px;
+            }
+        }
         @media (max-width: 920px) {
+            .user-chip {
+                display: none;
+            }
             .filter-grid {
                 grid-template-columns: repeat(2, minmax(150px, 1fr));
             }
@@ -634,20 +746,20 @@ $currentUser = $currentUser ?? null;
             body {
                 font-size: 13px;
             }
-            .app-corner-brand {
-                left: 6px;
-                font-size: 11px;
+            .app-brand {
+                max-width: 120px;
+                font-size: 24px;
             }
             .topbar-inner {
-                padding-left: 88px;
+                padding: 10px 12px;
             }
             .nav a {
                 font-size: 12px;
                 padding: 6px 8px;
             }
             .theme-switch {
-                padding: 1px;
-                gap: 1px;
+                width: 76px;
+                min-width: 76px;
             }
             h1 {
                 font-size: 1.55rem;
@@ -659,36 +771,10 @@ $currentUser = $currentUser ?? null;
                 font-size: 1.1rem;
             }
             .theme-choice {
-                width: 20px !important;
-                min-width: 20px;
-                height: 20px;
-                font-size: 9px;
-            }
-            label,
-            .muted,
-            .hint {
-                font-size: 12px;
-            }
-            input,
-            select,
-            textarea,
-            button {
-                font-size: 14px;
-            }
-        }
-        @media (max-width: 560px) {
-            .brand {
-                font-size: 16px;
-            }
-            .nav a {
-                font-size: 12px;
-                padding: 6px 8px;
-            }
-            .theme-choice {
-                width: 22px !important;
-                min-width: 22px;
-                height: 22px;
-                font-size: 10px;
+                width: 100% !important;
+                min-width: 0;
+                height: 28px;
+                font-size: 15px;
             }
         }
         @media (max-width: 680px) {
@@ -720,20 +806,28 @@ $currentUser = $currentUser ?? null;
 </head>
 <body<?php echo $pageClass !== '' ? ' class="' . e($pageClass) . '"' : ''; ?>>
     <header class="topbar">
-        <a class="app-corner-brand" href="<?php echo e(url('explore.php')); ?>"><?php echo e(APP_NAME); ?></a>
         <div class="topbar-inner">
+            <a class="app-brand" href="<?php echo e(url('explore.php')); ?>"><?php echo e(APP_NAME); ?></a>
             <?php if ($currentUser !== null): ?>
-                <span class="user-spot"><?php echo e((string) $currentUser['name']); ?></span>
-            <?php else: ?>
-                <span class="user-spot">Bem-vindo</span>
+                <div class="user-chip">
+                    <?php if ($headerAvatarUrl !== ''): ?>
+                        <img src="<?php echo e($headerAvatarUrl); ?>" alt="Foto de perfil" class="user-avatar">
+                    <?php else: ?>
+                        <span class="user-avatar user-avatar-fallback"><?php echo e($headerUserInitial); ?></span>
+                    <?php endif; ?>
+                    <span class="user-chip-name"><?php echo e((string) $currentUser['name']); ?></span>
+                </div>
             <?php endif; ?>
             <nav class="nav">
                 <?php if ($currentUser !== null): ?>
-                    <span class="muted">Olá, <?php echo e((string) $currentUser['name']); ?></span>
-                    <a href="<?php echo e(url('explore.php')); ?>">Explorar</a>
-                    <a href="<?php echo e(url('my_games.php')); ?>">Meus Jogos</a>
-                    <a href="<?php echo e(url('create_invite.php')); ?>">Criar Convite</a>
-                    <a href="<?php echo e(url('profile.php')); ?>">Perfil</a>
+                    <div class="theme-switch" role="group" aria-label="Tema">
+                        <button type="button" class="theme-choice" data-theme-choice="light" title="Tema claro">&#127774;</button>
+                        <button type="button" class="theme-choice" data-theme-choice="dark" title="Tema escuro">&#127769;</button>
+                    </div>
+                    <a class="<?php echo e($isActivePage('explore.php')); ?>" href="<?php echo e(url('explore.php')); ?>">Explorar</a>
+                    <a class="<?php echo e($isActivePage('my_games.php')); ?>" href="<?php echo e(url('my_games.php')); ?>">Meus Jogos</a>
+                    <a class="<?php echo e($isActivePage('create_invite.php')); ?>" href="<?php echo e(url('create_invite.php')); ?>">Criar Convite</a>
+                    <a class="<?php echo e($isActivePage('profile.php')); ?>" href="<?php echo e(url('profile.php')); ?>">Perfil</a>
                     <a href="<?php echo e(url('logout.php')); ?>">Sair</a>
                 <?php else: ?>
                     <a href="<?php echo e(url('login.php')); ?>">Entrar</a>
@@ -742,6 +836,47 @@ $currentUser = $currentUser ?? null;
             </nav>
         </div>
     </header>
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var themeButtons = document.querySelectorAll('[data-theme-choice]');
+            var storageKey = 'app_jogos_theme';
+
+            function applyTheme(theme) {
+                root.setAttribute('data-theme', theme);
+                try {
+                    localStorage.setItem(storageKey, theme);
+                } catch (error) {
+                    // ignore
+                }
+
+                themeButtons.forEach(function (button) {
+                    var isSelected = button.getAttribute('data-theme-choice') === theme;
+                    button.classList.toggle('is-selected', isSelected);
+                    button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+                });
+            }
+
+            if (themeButtons.length === 0) {
+                return;
+            }
+
+            var activeTheme = root.getAttribute('data-theme');
+            if (activeTheme !== 'dark' && activeTheme !== 'light') {
+                activeTheme = 'light';
+            }
+            applyTheme(activeTheme);
+
+            themeButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var nextTheme = button.getAttribute('data-theme-choice');
+                    if (nextTheme === 'dark' || nextTheme === 'light') {
+                        applyTheme(nextTheme);
+                    }
+                });
+            });
+        })();
+    </script>
     <main class="container">
         <?php foreach ($flashMessages as $flash): ?>
             <div class="flash <?php echo e((string) $flash['type']); ?>">

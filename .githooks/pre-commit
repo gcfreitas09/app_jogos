@@ -1,0 +1,49 @@
+#!/usr/bin/env sh
+set -eu
+
+if command -v php >/dev/null 2>&1; then
+    PHP_BIN="php"
+elif [ -x "/c/xampp2/php/php.exe" ]; then
+    PHP_BIN="/c/xampp2/php/php.exe"
+elif [ -x "C:/xampp2/php/php.exe" ]; then
+    PHP_BIN="C:/xampp2/php/php.exe"
+elif [ -x "C:\\xampp2\\php\\php.exe" ]; then
+    PHP_BIN="C:\\xampp2\\php\\php.exe"
+else
+    echo "[pre-commit] PHP nao encontrado. Instale o PHP CLI ou ajuste o hook."
+    exit 1
+fi
+
+STAGED_PHP_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.php$' || true)
+if [ -z "$STAGED_PHP_FILES" ]; then
+    exit 0
+fi
+
+HAS_ERROR=0
+
+for FILE in $STAGED_PHP_FILES; do
+    if [ ! -f "$FILE" ]; then
+        continue
+    fi
+
+    BOM_HEX=$(LC_ALL=C head -c 3 "$FILE" | od -An -t x1 | tr -d ' \n')
+    if [ "$BOM_HEX" = "efbbbf" ]; then
+        echo "[pre-commit] UTF-8 BOM detectado em: $FILE"
+        echo "             Salve este arquivo como UTF-8 sem BOM."
+        HAS_ERROR=1
+    fi
+
+    if ! "$PHP_BIN" -l "$FILE" >/dev/null 2>&1; then
+        echo "[pre-commit] Erro de sintaxe em: $FILE"
+        "$PHP_BIN" -l "$FILE" || true
+        HAS_ERROR=1
+    fi
+done
+
+if [ "$HAS_ERROR" -ne 0 ]; then
+    echo "[pre-commit] Commit bloqueado para evitar quebrar o app."
+    exit 1
+fi
+
+echo "[pre-commit] PHP validado com sucesso."
+exit 0

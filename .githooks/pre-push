@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+set -eu
+
+if command -v php >/dev/null 2>&1; then
+    PHP_BIN="php"
+elif [ -x "/c/xampp2/php/php.exe" ]; then
+    PHP_BIN="/c/xampp2/php/php.exe"
+elif [ -x "C:/xampp2/php/php.exe" ]; then
+    PHP_BIN="C:/xampp2/php/php.exe"
+elif [ -x "C:\\xampp2\\php\\php.exe" ]; then
+    PHP_BIN="C:\\xampp2\\php\\php.exe"
+else
+    echo "[pre-push] PHP nao encontrado. Instale o PHP CLI ou ajuste o hook."
+    exit 1
+fi
+
+PHP_FILES=$(git ls-files '*.php')
+if [ -z "$PHP_FILES" ]; then
+    exit 0
+fi
+
+HAS_ERROR=0
+
+for FILE in $PHP_FILES; do
+    if [ ! -f "$FILE" ]; then
+        continue
+    fi
+
+    BOM_HEX=$(LC_ALL=C head -c 3 "$FILE" | od -An -t x1 | tr -d ' \n')
+    if [ "$BOM_HEX" = "efbbbf" ]; then
+        echo "[pre-push] UTF-8 BOM detectado em: $FILE"
+        HAS_ERROR=1
+    fi
+
+    if ! "$PHP_BIN" -l "$FILE" >/dev/null 2>&1; then
+        echo "[pre-push] Erro de sintaxe em: $FILE"
+        "$PHP_BIN" -l "$FILE" || true
+        HAS_ERROR=1
+    fi
+done
+
+if [ "$HAS_ERROR" -ne 0 ]; then
+    echo "[pre-push] Push bloqueado para evitar deploy quebrado."
+    exit 1
+fi
+
+echo "[pre-push] Validacao global de PHP OK."
+exit 0
