@@ -177,9 +177,11 @@ class InviteMemberRepository
                     im.position,
                     im.joined_at,
                     u.name,
-                    u.email
+                    u.email,
+                    up.avatar_url
                 FROM invite_members im
                 INNER JOIN users u ON u.id = im.user_id
+                LEFT JOIN user_profiles up ON up.user_id = u.id
                 WHERE im.invite_id = :invite_id
                   AND im.role = :role
                   AND im.status = :status

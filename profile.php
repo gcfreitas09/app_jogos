@@ -264,14 +264,23 @@ require __DIR__ . '/templates/header.php';
         </div>
 
         <div>
-            <label for="default_radius_km">Raio padrao de busca</label>
-            <select id="default_radius_km" name="default_radius_km">
+            <label for="default_radius_km">Raio padrão de busca por games (km)</label>
+            <input
+                id="default_radius_km"
+                type="number"
+                name="default_radius_km"
+                min="<?php echo e((string) App\Services\InviteService::MIN_RADIUS_KM); ?>"
+                max="<?php echo e((string) App\Services\InviteService::MAX_RADIUS_KM); ?>"
+                step="1"
+                list="default_radius_km_options"
+                value="<?php echo e((string) $defaultRadiusKm); ?>"
+                required
+            >
+            <datalist id="default_radius_km_options">
                 <?php foreach (App\Services\InviteService::allowedRadii() as $radius): ?>
-                    <option value="<?php echo e((string) $radius); ?>" <?php echo $defaultRadiusKm === $radius ? 'selected' : ''; ?>>
-                        <?php echo e((string) $radius); ?> km
-                    </option>
+                    <option value="<?php echo e((string) $radius); ?>"><?php echo e((string) $radius); ?> km</option>
                 <?php endforeach; ?>
-            </select>
+            </datalist>
         </div>
 
         <div>

@@ -35,9 +35,40 @@ if ((string) ($invite['address'] ?? '') !== '' || (string) ($invite['location_na
     $mapUrl = 'https://www.google.com/maps/search/?api=1&query=' . $invite['lat'] . ',' . $invite['lng'];
 }
 
+$resolveAvatarUrl = static function (?string $avatar): string {
+    $clean = trim((string) $avatar);
+    if ($clean === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $clean) === 1) {
+        return $clean;
+    }
+
+    return url($clean);
+};
+
 $title = 'Detalhe do Convite';
 require __DIR__ . '/templates/header.php';
 ?>
+<style>
+    .participant-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .participant-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1px solid #b8ccda;
+        flex: 0 0 34px;
+    }
+    html[data-theme='dark'] .participant-avatar {
+        border-color: #3c5f79;
+    }
+</style>
 <section class="card card-soft">
     <div class="section-head">
         <h1 style="margin: 0;">Detalhes do Convite</h1>
@@ -141,10 +172,20 @@ require __DIR__ . '/templates/header.php';
     <?php else: ?>
         <div class="participant-list">
             <?php foreach ($invite['players'] as $member): ?>
+                <?php $memberAvatar = $resolveAvatarUrl((string) ($member['avatar_url'] ?? '')); ?>
                 <div class="participant-item">
-                    <div>
-                        <strong><?php echo e((string) $member['name']); ?></strong>
-                        <p class="muted" style="margin: 2px 0 0;"><?php echo e((string) $member['email']); ?></p>
+                    <div class="participant-main">
+                        <?php if ($memberAvatar !== ''): ?>
+                            <img
+                                src="<?php echo e($memberAvatar); ?>"
+                                alt="Foto de <?php echo e((string) $member['name']); ?>"
+                                class="participant-avatar"
+                            >
+                        <?php endif; ?>
+                        <div>
+                            <strong><?php echo e((string) $member['name']); ?></strong>
+                            <p class="muted" style="margin: 2px 0 0;"><?php echo e((string) $member['email']); ?></p>
+                        </div>
                     </div>
                     <span class="muted"><?php echo e((new DateTimeImmutable((string) $member['joined_at']))->format('d/m/Y H:i')); ?></span>
                 </div>
@@ -163,10 +204,20 @@ require __DIR__ . '/templates/header.php';
     <?php else: ?>
         <div class="participant-list">
             <?php foreach ($invite['waitlist'] as $member): ?>
+                <?php $memberAvatar = $resolveAvatarUrl((string) ($member['avatar_url'] ?? '')); ?>
                 <div class="participant-item">
-                    <div>
-                        <strong>#<?php echo e((string) $member['position']); ?> - <?php echo e((string) $member['name']); ?></strong>
-                        <p class="muted" style="margin: 2px 0 0;"><?php echo e((string) $member['email']); ?></p>
+                    <div class="participant-main">
+                        <?php if ($memberAvatar !== ''): ?>
+                            <img
+                                src="<?php echo e($memberAvatar); ?>"
+                                alt="Foto de <?php echo e((string) $member['name']); ?>"
+                                class="participant-avatar"
+                            >
+                        <?php endif; ?>
+                        <div>
+                            <strong>#<?php echo e((string) $member['position']); ?> - <?php echo e((string) $member['name']); ?></strong>
+                            <p class="muted" style="margin: 2px 0 0;"><?php echo e((string) $member['email']); ?></p>
+                        </div>
                     </div>
                     <span class="muted"><?php echo e((new DateTimeImmutable((string) $member['joined_at']))->format('d/m/Y H:i')); ?></span>
                 </div>
