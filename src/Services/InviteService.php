@@ -20,7 +20,9 @@ class InviteService
     ];
     public const LEVELS = ['iniciante', 'intermediario', 'avancado'];
     public const PERIODS = ['all', 'today', 'week', 'month'];
-    public const RADII = [1, 5, 10, 25];
+    public const RADII = [1, 5, 10, 25, 50];
+    public const MIN_RADIUS_KM = 1;
+    public const MAX_RADIUS_KM = 200;
     public const PRIVACY = ['public', 'private'];
 
     private PDO $pdo;
@@ -58,6 +60,11 @@ class InviteService
     public static function allowedRadii(): array
     {
         return self::RADII;
+    }
+
+    public static function isValidRadius(int $radius): bool
+    {
+        return $radius >= self::MIN_RADIUS_KM && $radius <= self::MAX_RADIUS_KM;
     }
 
     public static function allowedPrivacy(): array
@@ -550,7 +557,7 @@ class InviteService
             return null;
         }
 
-        if (!in_array($radius, self::RADII, true)) {
+        if (!self::isValidRadius($radius)) {
             return null;
         }
 

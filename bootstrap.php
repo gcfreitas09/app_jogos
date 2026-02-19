@@ -53,6 +53,6 @@ $mailer = new Mailer($config['mail'], __DIR__ . '/storage/logs/mail.log');
 
 $authService = new AuthService($userRepository);
 $inviteService = new InviteService($pdo, $inviteRepository, $inviteMemberRepository, $mailer);
-$profileService = new ProfileService($profileRepository);
+$profileService = new ProfileService($profileRepository, $userRepository);
 
 require_once __DIR__ . '/src/Core/helpers.php';

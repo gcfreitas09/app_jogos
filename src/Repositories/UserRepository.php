@@ -44,4 +44,13 @@ class UserRepository
 
         return $user === false ? null : $user;
     }
+
+    public function updateName(int $id, string $name): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE users SET name = :name WHERE id = :id');
+        $stmt->execute([
+            ':id' => $id,
+            ':name' => $name,
+        ]);
+    }
 }

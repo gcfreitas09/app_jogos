@@ -13,7 +13,7 @@ if ($currentUser === null) {
 
 $profile = $profileService->getProfile((int) $currentUser['id']);
 $defaultRadius = $profile !== null ? (int) $profile['default_radius_km'] : 5;
-if (!in_array($defaultRadius, App\Services\InviteService::allowedRadii(), true)) {
+if (!App\Services\InviteService::isValidRadius($defaultRadius)) {
     $defaultRadius = 5;
 }
 
@@ -29,7 +29,7 @@ if (!in_array($selectedPeriod, App\Services\InviteService::allowedPeriods(), tru
 
 $onlyWithSlots = ((string) ($_GET['only_with_slots'] ?? '0')) === '1';
 $selectedRadius = (int) ($_GET['radius_km'] ?? $defaultRadius);
-if (!in_array($selectedRadius, App\Services\InviteService::allowedRadii(), true)) {
+if (!App\Services\InviteService::isValidRadius($selectedRadius)) {
     $selectedRadius = $defaultRadius;
 }
 
@@ -300,14 +300,22 @@ require __DIR__ . '/templates/header.php';
         </div>
 
         <div>
-            <label for="radius_km">Raio</label>
-            <select id="radius_km" name="radius_km">
+            <label for="radius_km">Raio de busca (km)</label>
+            <input
+                id="radius_km"
+                name="radius_km"
+                type="number"
+                min="<?php echo e((string) App\Services\InviteService::MIN_RADIUS_KM); ?>"
+                max="<?php echo e((string) App\Services\InviteService::MAX_RADIUS_KM); ?>"
+                step="1"
+                list="radius_km_options"
+                value="<?php echo e((string) $selectedRadius); ?>"
+            >
+            <datalist id="radius_km_options">
                 <?php foreach (App\Services\InviteService::allowedRadii() as $radius): ?>
-                    <option value="<?php echo e((string) $radius); ?>" <?php echo $selectedRadius === $radius ? 'selected' : ''; ?>>
-                        <?php echo e((string) $radius); ?> km
-                    </option>
+                    <option value="<?php echo e((string) $radius); ?>"><?php echo e((string) $radius); ?> km</option>
                 <?php endforeach; ?>
-            </select>
+            </datalist>
         </div>
 
         <div class="filter-check">
