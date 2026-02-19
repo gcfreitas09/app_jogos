@@ -454,6 +454,63 @@ class InviteService
         }
     }
 
+    public function deleteInvite(int $inviteId, int $userId): array
+    {
+        if ($inviteId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Convite invalido.',
+            ];
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $invite = $this->invites->findByIdForUpdate($inviteId);
+            if ($invite === null) {
+                $this->pdo->rollBack();
+                return [
+                    'success' => false,
+                    'message' => 'Convite nao encontrado.',
+                ];
+            }
+
+            if ((int) $invite['creator_id'] !== $userId) {
+                $this->pdo->rollBack();
+                return [
+                    'success' => false,
+                    'message' => 'Apenas o criador pode excluir este convite.',
+                ];
+            }
+
+            $startsAt = new DateTimeImmutable((string) $invite['starts_at']);
+            if ($startsAt <= new DateTimeImmutable('now')) {
+                $this->pdo->rollBack();
+                return [
+                    'success' => false,
+                    'message' => 'Nao e possivel excluir convite ja iniciado.',
+                ];
+            }
+
+            $this->invites->deleteById($inviteId);
+            $this->pdo->commit();
+
+            return [
+                'success' => true,
+                'message' => 'Convite excluido com sucesso.',
+            ];
+        } catch (Throwable $throwable) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Nao foi possivel excluir o convite agora.',
+            ];
+        }
+    }
+
     private function parseDate(string $rawDate): ?DateTimeImmutable
     {
         $cleanDate = trim($rawDate);

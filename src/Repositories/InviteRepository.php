@@ -520,6 +520,12 @@ class InviteRepository
         $stmt->execute([':id' => $inviteId]);
     }
 
+    public function deleteById(int $inviteId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM invites WHERE id = :id');
+        $stmt->execute([':id' => $inviteId]);
+    }
+
     private function distanceExpression(
         ?float $userLat,
         ?float $userLng,
